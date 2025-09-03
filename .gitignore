@@ -14,9 +14,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Environment variables
-.env
-.env.*
-!.env.example  # Keep this for documentation
+
 
 # Editor directories and files
 .vscode/

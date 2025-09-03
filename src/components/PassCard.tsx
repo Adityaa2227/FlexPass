@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Clock, ExternalLink, RotateCcw, Plus, X } from 'lucide-react'
+import { Clock, Zap, ExternalLink } from 'lucide-react'
 import { Pass } from '../types'
 import { useFlexPass } from '../hooks/useFlexPass'
 
@@ -17,7 +17,7 @@ export function PassCard({ pass }: PassCardProps) {
   useEffect(() => {
     const updateTimer = () => {
       const now = Date.now()
-      const remaining = (pass.expirationTime * 1000) - now
+      const remaining = pass.expirationTime - now
       const totalDuration = 24 * 60 * 60 * 1000 // Assume 24h for progress calculation
 
       if (remaining <= 0) {
@@ -58,19 +58,15 @@ export function PassCard({ pass }: PassCardProps) {
     }
   }
 
-  const handleAccess = () => {
-    // Open provider's website or API endpoint
+  const getServiceUrl = (providerName: string) => {
     const providerUrls: { [key: string]: string } = {
-      'ChatGPT': 'https://chat.openai.com',
-      'Spotify': 'https://open.spotify.com',
-      'Netflix': 'https://netflix.com',
-      'Kindle': 'https://read.amazon.com'
+      'ChatGPT': '/service/chatgpt',
+      'Spotify': '/service/spotify',
+      'Netflix': '/service/netflix',
+      'Kindle': '/service/kindle'
     }
     
-    const url = providerUrls[pass.provider.name] || '#'
-    if (url !== '#') {
-      window.open(url, '_blank')
-    }
+    return providerUrls[providerName] || '#'
   }
 
   return (
@@ -153,36 +149,20 @@ export function PassCard({ pass }: PassCardProps) {
         <div className="flex gap-2">
           {pass.isValid ? (
             <>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleAccess}
-                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md flex items-center justify-center gap-2"
+              <Link
+                to={getServiceUrl(pass.provider.name)}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors flex-1"
               >
                 <ExternalLink className="w-4 h-4" />
-                Access
-              </motion.button>
-              
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleExtend}
-                disabled={isLoading}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md flex items-center justify-center gap-2"
+                Access {pass.provider.name}
+              </Link>
+              <Link
+                to={`/pass/${pass.tokenId}`}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
               >
-                <Plus className="w-4 h-4" />
-                Extend
-              </motion.button>
-              
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleRevoke}
-                disabled={isLoading}
-                className="px-3 py-2.5 border border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </motion.button>
+                <ExternalLink className="w-4 h-4" />
+                Details
+              </Link>
             </>
           ) : (
             <Link to="/buy" className="flex-1">
@@ -191,19 +171,12 @@ export function PassCard({ pass }: PassCardProps) {
                 whileTap={{ scale: 0.98 }}
                 className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-md flex items-center justify-center gap-2"
               >
-                <RotateCcw className="w-4 h-4" />
+                <Zap className="w-4 h-4" />
                 Renew Pass
               </motion.button>
             </Link>
           )}
         </div>
-        
-        <Link 
-          to={`/pass/${pass.tokenId}`}
-          className="block mt-3 text-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-        >
-          View Details →
-        </Link>
       </div>
     </motion.div>
   )

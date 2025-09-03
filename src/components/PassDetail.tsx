@@ -25,7 +25,7 @@ export function PassDetail() {
 
     const updateTimer = () => {
       const now = Date.now()
-      const remaining = (pass.expirationTime * 1000) - now
+      const remaining = pass.expirationTime - now
 
       if (remaining <= 0) {
         setTimeRemaining('Expired')

@@ -9,7 +9,9 @@ import { Header } from './components/Header'
 import { WalletConnect } from './components/WalletConnect'
 import { BuyFlow } from './components/BuyFlow'
 import { PassDetail } from './components/PassDetail'
-import { AdminConsole } from './components/AdminConsole'
+import { AdminRoute } from './components/AdminRoute'
+import { SpotifyClone } from './components/services/SpotifyClone'
+import { ChatGPTClone } from './components/services/ChatGPTClone'
 import { useCDPWallet } from './hooks/useCDPWallet'
 import { initializeAccessibility } from './utils/accessibility'
 
@@ -35,7 +37,9 @@ function AppContent() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/buy" element={<BuyFlow />} />
           <Route path="/pass/:tokenId" element={<PassDetail />} />
-          <Route path="/admin" element={<AdminConsole />} />
+          <Route path="/admin" element={<AdminRoute />} />
+          <Route path="/service/spotify" element={<SpotifyClone />} />
+          <Route path="/service/chatgpt" element={<ChatGPTClone />} />
         </Routes>
       </main>
     </div>

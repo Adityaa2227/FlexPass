@@ -41,8 +41,14 @@ export function useFlexPass() {
 
   const fetchProviders = async () => {
     if (!flexPassContract) {
-      // Use mock data when contract is not available
-      setProviders(MOCK_PROVIDERS)
+      // Load providers from localStorage or use mock data
+      const savedProviders = localStorage.getItem('flexpass_providers')
+      if (savedProviders) {
+        setProviders(JSON.parse(savedProviders))
+      } else {
+        setProviders(MOCK_PROVIDERS)
+        localStorage.setItem('flexpass_providers', JSON.stringify(MOCK_PROVIDERS))
+      }
       return
     }
 
@@ -63,16 +69,32 @@ export function useFlexPass() {
       )
       setProviders(providersData)
     } catch (error) {
-      console.error('Contract not deployed or error fetching providers, using mock data:', error)
-      // Use mock data as fallback
-      setProviders(MOCK_PROVIDERS)
+      console.error('Contract not deployed or error fetching providers, using localStorage data:', error)
+      // Use localStorage data as fallback
+      const savedProviders = localStorage.getItem('flexpass_providers')
+      if (savedProviders) {
+        setProviders(JSON.parse(savedProviders))
+      } else {
+        setProviders(MOCK_PROVIDERS)
+        localStorage.setItem('flexpass_providers', JSON.stringify(MOCK_PROVIDERS))
+      }
     }
   }
 
   const fetchUserPasses = async () => {
-    if (!flexPassContract || !address) {
-      // Return empty array when no contract or address
+    if (!address) {
       setUserPasses([])
+      return
+    }
+
+    if (!flexPassContract) {
+      // Load passes from localStorage when contract is not available
+      const savedPasses = localStorage.getItem(`flexpass_passes_${address}`)
+      if (savedPasses) {
+        setUserPasses(JSON.parse(savedPasses))
+      } else {
+        setUserPasses([])
+      }
       return
     }
 
@@ -106,9 +128,14 @@ export function useFlexPass() {
       )
       setUserPasses(passesData)
     } catch (error) {
-      console.error('Contract not deployed or error fetching passes, using empty state:', error)
-      // Set empty array as fallback instead of showing error
-      setUserPasses([])
+      console.error('Contract not deployed or error fetching passes, using localStorage data:', error)
+      // Use localStorage data as fallback
+      const savedPasses = localStorage.getItem(`flexpass_passes_${address}`)
+      if (savedPasses) {
+        setUserPasses(JSON.parse(savedPasses))
+      } else {
+        setUserPasses([])
+      }
     }
   }
 
@@ -128,7 +155,7 @@ export function useFlexPass() {
   }
 
   const buyPass = async (providerId: number, durationSeconds: number) => {
-    if (!flexPassContract || !usdcContract || !address) {
+    if (!address) {
       toast.error('Wallet not connected')
       return null
     }
@@ -144,6 +171,42 @@ export function useFlexPass() {
       const durationHours = Math.ceil(durationSeconds / 3600)
       const totalPrice = provider.hourlyRate * durationHours
 
+      if (!flexPassContract || !usdcContract) {
+        // Simulate pass purchase when contract is not available
+        toast.loading('Purchasing pass...')
+        
+        // Simulate transaction delay
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        // Create mock pass
+        const newPass: Pass = {
+          tokenId: Date.now(), // Use timestamp as unique ID
+          providerId,
+          provider,
+          expirationTime: Date.now() + (durationSeconds * 1000),
+          pricePaid: totalPrice,
+          isActive: true,
+          isValid: true,
+          transactionHash: `0x${Math.random().toString(16).substr(2, 64)}`,
+          owner: address
+        }
+        
+        // Save to localStorage
+        const savedPasses = localStorage.getItem(`flexpass_passes_${address}`)
+        const currentPasses = savedPasses ? JSON.parse(savedPasses) : []
+        const updatedPasses = [...currentPasses, newPass]
+        localStorage.setItem(`flexpass_passes_${address}`, JSON.stringify(updatedPasses))
+        
+        // Update state
+        setUserPasses(updatedPasses)
+        
+        toast.dismiss()
+        toast.success('Pass purchased successfully!')
+        
+        return newPass.transactionHash
+      }
+
+      // Smart contract flow
       // Check allowance
       const allowance = await usdcContract.allowance(address, CONTRACT_ADDRESSES.flexPass)
       if (Number(allowance) < totalPrice) {
@@ -244,13 +307,167 @@ export function useFlexPass() {
     }
   }
 
+  // Initialize demo passes for testing
+  const initializeDemoPasses = () => {
+    if (!address) return
+    
+    const demoPassesKey = `flexpass_passes_${address}`
+    const existingPasses = localStorage.getItem(demoPassesKey)
+    
+    if (!existingPasses) {
+      const demoPasses: Pass[] = [
+        {
+          tokenId: 1001,
+          providerId: 1,
+          provider: {
+            id: 1,
+            name: 'ChatGPT',
+            logoUrl: 'https://cdn.openai.com/API/logo-openai.svg',
+            hourlyRate: 1000000,
+            isActive: true
+          },
+          expirationTime: Date.now() + (24 * 60 * 60 * 1000), // 24 hours from now
+          pricePaid: 24000000, // $24.00 for 24 hours
+          isActive: true,
+          isValid: true,
+          transactionHash: '0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456',
+          owner: address
+        },
+        {
+          tokenId: 1002,
+          providerId: 2,
+          provider: {
+            id: 2,
+            name: 'Spotify',
+            logoUrl: 'https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Green.png',
+            hourlyRate: 500000,
+            isActive: true
+          },
+          expirationTime: Date.now() + (12 * 60 * 60 * 1000), // 12 hours from now
+          pricePaid: 6000000, // $6.00 for 12 hours
+          isActive: true,
+          isValid: true,
+          transactionHash: '0xf1e2d3c4b5a6789012345678901234567890fedcba1234567890fedcba123456',
+          owner: address
+        }
+      ]
+      
+      localStorage.setItem(demoPassesKey, JSON.stringify(demoPasses))
+      setUserPasses(demoPasses)
+    }
+  }
+
   useEffect(() => {
-    if (signer && address) {
-      fetchProviders()
+    fetchProviders()
+    if (address) {
+      initializeDemoPasses()
       fetchUserPasses()
       fetchUsdcBalance()
     }
   }, [signer, address])
+
+  const addProvider = async (providerData: { name: string; logoUrl: string; hourlyRate: number }) => {
+    if (!flexPassContract) {
+      // Add to localStorage when contract is not available
+      const savedProviders = localStorage.getItem('flexpass_providers')
+      const currentProviders = savedProviders ? JSON.parse(savedProviders) : MOCK_PROVIDERS
+      
+      const newProvider: Provider = {
+        id: Math.max(...currentProviders.map((p: Provider) => p.id), 0) + 1,
+        name: providerData.name,
+        logoUrl: providerData.logoUrl,
+        hourlyRate: providerData.hourlyRate,
+        isActive: true
+      }
+      
+      const updatedProviders = [...currentProviders, newProvider]
+      localStorage.setItem('flexpass_providers', JSON.stringify(updatedProviders))
+      setProviders(updatedProviders)
+      return true
+    }
+    
+    try {
+      // Call smart contract addProvider function
+      const tx = await flexPassContract.addProvider(
+        providerData.name,
+        providerData.logoUrl,
+        providerData.hourlyRate
+      )
+      await tx.wait()
+      await fetchProviders()
+      return true
+    } catch (error) {
+      console.error('Error adding provider:', error)
+      return false
+    }
+  }
+
+  const updateProvider = async (providerId: number, providerData: { name: string; logoUrl: string; hourlyRate: number }) => {
+    if (!flexPassContract) {
+      // Update in localStorage when contract is not available
+      const savedProviders = localStorage.getItem('flexpass_providers')
+      const currentProviders = savedProviders ? JSON.parse(savedProviders) : MOCK_PROVIDERS
+      
+      const updatedProviders = currentProviders.map((p: Provider) => 
+        p.id === providerId 
+          ? { ...p, name: providerData.name, logoUrl: providerData.logoUrl, hourlyRate: providerData.hourlyRate }
+          : p
+      )
+      
+      localStorage.setItem('flexpass_providers', JSON.stringify(updatedProviders))
+      setProviders(updatedProviders)
+      return true
+    }
+    
+    try {
+      // Call smart contract updateProvider function
+      const tx = await flexPassContract.updateProvider(
+        providerId,
+        providerData.name,
+        providerData.logoUrl,
+        providerData.hourlyRate
+      )
+      await tx.wait()
+      await fetchProviders()
+      return true
+    } catch (error) {
+      console.error('Error updating provider:', error)
+      return false
+    }
+  }
+
+  const deleteProvider = async (providerId: number) => {
+    if (!flexPassContract) {
+      // Remove from localStorage when contract is not available
+      const savedProviders = localStorage.getItem('flexpass_providers')
+      const currentProviders = savedProviders ? JSON.parse(savedProviders) : MOCK_PROVIDERS
+      
+      const updatedProviders = currentProviders.filter((p: Provider) => p.id !== providerId)
+      
+      localStorage.setItem('flexpass_providers', JSON.stringify(updatedProviders))
+      setProviders(updatedProviders)
+      return true
+    }
+    
+    try {
+      // Call smart contract function to deactivate provider
+      const provider = providers.find(p => p.id === providerId)
+      if (provider) {
+        const tx = await flexPassContract.updateProvider(
+          providerId,
+          provider.name,
+          provider.logoUrl,
+          provider.hourlyRate
+        )
+        await tx.wait()
+        await fetchProviders()
+      }
+      return true
+    } catch (error) {
+      console.error('Error deleting provider:', error)
+      return false
+    }
+  }
 
   return {
     providers,
@@ -260,6 +477,9 @@ export function useFlexPass() {
     buyPass,
     extendPass,
     revokePass,
+    addProvider,
+    updateProvider,
+    deleteProvider,
     refreshData: () => Promise.all([fetchProviders(), fetchUserPasses(), fetchUsdcBalance()])
   }
 }

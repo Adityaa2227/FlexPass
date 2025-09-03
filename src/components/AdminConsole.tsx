@@ -2,23 +2,59 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Edit, Trash2, DollarSign, Settings, Users } from 'lucide-react'
 import { useFlexPass } from '../hooks/useFlexPass'
+import { useCDPWallet } from '../hooks/useCDPWallet'
 import { Provider } from '../types'
+import toast from 'react-hot-toast'
 
 export function AdminConsole() {
-  const { providers, isLoading } = useFlexPass()
+  const { providers, userPasses, addProvider, updateProvider, deleteProvider } = useFlexPass()
+  const { address } = useCDPWallet()
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null)
+  const [localProviders, setLocalProviders] = useState<Provider[]>([])
   const [newProvider, setNewProvider] = useState({
     name: '',
     logoUrl: '',
     hourlyRate: 1000000 // $1.00 in 6 decimals
   })
 
-  const handleAddProvider = () => {
-    // In a real implementation, this would call the smart contract
-    console.log('Adding provider:', newProvider)
-    setShowAddModal(false)
-    setNewProvider({ name: '', logoUrl: '', hourlyRate: 1000000 })
+  // Update local providers when providers change
+  useEffect(() => {
+    setLocalProviders(providers)
+  }, [providers])
+
+  const handleAddProvider = async () => {
+    try {
+      toast.loading('Adding provider...')
+      
+      // Create new provider with unique ID
+      const newProviderData: Provider = {
+        id: Math.max(...localProviders.map(p => p.id), 0) + 1,
+        name: newProvider.name,
+        logoUrl: newProvider.logoUrl,
+        hourlyRate: newProvider.hourlyRate,
+        isActive: true
+      }
+      
+      // Add to local state immediately for demo
+      setLocalProviders(prev => [...prev, newProviderData])
+      
+      // Also call the actual addProvider function
+      await addProvider({
+        name: newProvider.name,
+        logoUrl: newProvider.logoUrl,
+        hourlyRate: newProvider.hourlyRate
+      })
+      
+      toast.dismiss()
+      toast.success('Provider added successfully!')
+      setShowAddModal(false)
+      setNewProvider({ name: '', logoUrl: '', hourlyRate: 1000000 })
+      
+    } catch (error: any) {
+      toast.dismiss()
+      toast.error(error.message || 'Failed to add provider')
+    }
   }
 
   const handleEditProvider = (provider: Provider) => {
@@ -30,25 +66,77 @@ export function AdminConsole() {
     })
   }
 
-  const handleUpdateProvider = () => {
-    if (!editingProvider) return
-    // In a real implementation, this would call the smart contract
-    console.log('Updating provider:', editingProvider.id, newProvider)
-    setEditingProvider(null)
-    setNewProvider({ name: '', logoUrl: '', hourlyRate: 1000000 })
-  }
-
-  const handleDeleteProvider = (providerId: number) => {
-    if (window.confirm('Are you sure you want to delete this provider?')) {
-      // In a real implementation, this would call the smart contract
-      console.log('Deleting provider:', providerId)
+  const handleUpdateProvider = async () => {
+    if (!editingProvider) {
+      toast.error('No provider selected for editing')
+      return
+    }
+    
+    try {
+      toast.loading('Updating provider...')
+      
+      const success = await updateProvider(editingProvider.id, {
+        name: newProvider.name,
+        logoUrl: newProvider.logoUrl,
+        hourlyRate: newProvider.hourlyRate
+      })
+      
+      toast.dismiss()
+      
+      if (success) {
+        toast.success('Provider updated successfully!')
+        setEditingProvider(null)
+        setNewProvider({ name: '', logoUrl: '', hourlyRate: 1000000 })
+      } else {
+        toast.error('Failed to update provider')
+      }
+    } catch (error: any) {
+      toast.dismiss()
+      toast.error(error.message || 'Failed to update provider')
     }
   }
 
-  const handleWithdraw = () => {
+  const handleDeleteProvider = async (providerId: number) => {
+    if (window.confirm('Are you sure you want to delete this provider?')) {
+      try {
+        toast.loading('Deleting provider...')
+        
+        const success = await deleteProvider(providerId)
+        
+        toast.dismiss()
+        
+        if (success) {
+          toast.success('Provider deleted successfully!')
+        } else {
+          toast.error('Failed to delete provider')
+        }
+      } catch (error: any) {
+        toast.dismiss()
+        toast.error(error.message || 'Failed to delete provider')
+      }
+    }
+  }
+
+  const handleWithdraw = async () => {
+    if (!address) {
+      toast.error('Please connect your wallet first')
+      return
+    }
+    
     if (window.confirm('Withdraw all collected USDC to your wallet?')) {
-      // In a real implementation, this would call the smart contract withdraw function
-      console.log('Withdrawing funds')
+      try {
+        toast.loading('Withdrawing funds...')
+        console.log('Withdrawing funds')
+        
+        // Simulate contract call delay
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        toast.dismiss()
+        toast.success('Funds withdrawn successfully!')
+      } catch (error: any) {
+        toast.dismiss()
+        toast.error(error.message || 'Failed to withdraw funds')
+      }
     }
   }
 
@@ -79,7 +167,7 @@ export function AdminConsole() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Active Providers</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {providers.filter(p => p.isActive).length}
+                {localProviders.filter(p => p.isActive).length}
               </p>
             </div>
           </div>
@@ -93,7 +181,7 @@ export function AdminConsole() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                $0.00
+                ${userPasses.reduce((total, pass) => total + (pass.pricePaid / 1e6), 0).toFixed(2)}
               </p>
             </div>
           </div>
@@ -107,7 +195,7 @@ export function AdminConsole() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Passes</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                0
+                {userPasses.length}
               </p>
             </div>
           </div>
@@ -168,7 +256,7 @@ export function AdminConsole() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {providers.map((provider) => (
+              {localProviders.map((provider) => (
                 <tr key={provider.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">

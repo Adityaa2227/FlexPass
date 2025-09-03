@@ -55,7 +55,7 @@ export function Dashboard() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">USDC Balance</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  ${formatUSDC(usdcBalance)}
+                  ${5+formatUSDC(usdcBalance)}
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">

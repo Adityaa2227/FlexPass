@@ -1,0 +1,73 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ServiceProvider {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  apiEndpoint  String   @map("api_endpoint")
+  price        String   // Price in USDC (e.g., "0.05")
+  walletAddress String  @map("wallet_address")
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  activePasses ActivePass[]
+  
+  @@map("service_providers")
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  txHash      String   @unique @map("tx_hash")
+  fromAddress String   @map("from_address")
+  toAddress   String   @map("to_address")
+  amount      String   // Amount as string to avoid precision issues
+  currency    String   // "USDC", "ETH", etc.
+  timestamp   DateTime @default(now())
+  status      TransactionStatus @default(PENDING)
+  
+  // Optional: Link to active pass created by this transaction
+  activePassId String? @map("active_pass_id")
+  activePass   ActivePass? @relation(fields: [activePassId], references: [id])
+  
+  @@map("transactions")
+}
+
+model ActivePass {
+  id           String   @id @default(cuid())
+  userWallet   String   @map("user_wallet")
+  serviceId    String   @map("service_id")
+  passType     PassType @map("pass_type")
+  expiryDate   DateTime? @map("expiry_date") // For time-based passes
+  remainingUses Int?    @map("remaining_uses") // For usage-based passes
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  serviceProvider ServiceProvider @relation(fields: [serviceId], references: [id])
+  transactions    Transaction[]
+  
+  @@map("active_passes")
+  @@index([userWallet, serviceId])
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+enum PassType {
+  TIME_BASED    // Expires after certain time
+  USAGE_BASED   // Expires after certain number of uses
+  UNLIMITED     // Never expires (premium subscription)
+}
