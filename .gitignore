@@ -14,7 +14,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Environment variables
-
+.env
 
 # Editor directories and files
 .vscode/
